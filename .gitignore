@@ -4,3 +4,4 @@ CarND-Traffic-Signs/data
 models
 *.swp
 *.p
+*.npy
