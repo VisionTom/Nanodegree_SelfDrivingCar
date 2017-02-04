@@ -3,7 +3,7 @@
 
 # ## Imports
 
-# In[72]:
+# In[ ]:
 
 #Imports
 import ipdb
@@ -32,7 +32,7 @@ get_ipython().magic('matplotlib inline')
 
 # ## Constants
 
-# In[73]:
+# In[ ]:
 
 #Constants
 
@@ -45,8 +45,8 @@ FILENAME_CSV = 'driving_log.csv'
 #Image 
 IMAGE_CUT_TOP_HEIGHT = 55
 IMAGE_CUT_DOWN_HEIGHT = 25
-IMAGE_RESIZE_WIDTH = 100
-IMAGE_RESIZE_HEIGHT = 100
+IMAGE_RESIZE_WIDTH = 64
+IMAGE_RESIZE_HEIGHT = 64
 
 #Camera
 CAMERA_LEFT_RIGHT_OFFSET = 0.2
@@ -63,7 +63,7 @@ SPEED_MINIMUM = 20
 
 # ## Read CSVs
 
-# In[74]:
+# In[ ]:
 
 #Read CSV
 def read_csv(path):
@@ -90,17 +90,12 @@ def read_csv(path):
 
 # ## Read Images
 
-# In[75]:
+# In[ ]:
 
 #Read Images
 
 def resize_and_normalize(img):
-    #printing out some stats and plotting
-    #print('This image is:', type(img), 'with dimesions:', img.shape)
-    #print(img)
-    #Cut Top and Bottom (sky and car)
-    #img_cut = img[IMAGE_CUT_TOP_HEIGHT:img.shape[0]-IMAGE_CUT_DOWN_HEIGHT, :, :]
-    
+    #Cutting the Top and the Bottom of the image
     img_cut = img[IMAGE_CUT_TOP_HEIGHT:160-IMAGE_CUT_DOWN_HEIGHT, :, :]
 
     #Resize to smaller image size
@@ -111,13 +106,10 @@ def resize_and_normalize(img):
 
     return img_norm
 
-#image = cv2.imread(PATH_TRAIN_FOLDER+'IMG/center_2016_12_01_13_30_48_287.jpg')
-#plt.imshow(resize_image(image))
-
 
 # ## Augmentation
 
-# In[76]:
+# In[ ]:
 
 def augmentation(path, steering, validation):    
 
@@ -169,34 +161,43 @@ def random_darken(image):
 
 # ## Model
 
-# In[77]:
+# In[ ]:
 
-# #Model
-# def model(load, shape, checkpoint=None):
-#     """Return a model from file or to train on."""
-#     if load and checkpoint: return load_model(checkpoint)
-
-#     conv_layers, dense_layers = [32, 32, 64, 128], [1024, 512]
+#Model
+def model(load, shape, checkpoint=None):
     
-#     model = Sequential()
-#     model.add(Convolution2D(32, 3, 3, activation='elu', input_shape=shape))
-#     model.add(MaxPooling2D())
-#     for cl in conv_layers:
-#         model.add(Convolution2D(cl, 3, 3, activation='elu'))
-#         model.add(MaxPooling2D())
-#     model.add(Flatten())
-#     for dl in dense_layers:
-#         model.add(Dense(dl, activation='elu'))
-#         model.add(Dropout(0.5))
-#     model.add(Dense(1, activation='linear'))
-#     model.compile(loss='mse', optimizer="adam")
-#     return model
+    model = Sequential()
+    model.add(Convolution2D(32, 5, 5, activation='elu', input_shape=shape))
+    model.add(MaxPooling2D())
+
+    model.add(Convolution2D(32, 5, 5, activation='elu'))
+    model.add(MaxPooling2D())
+    
+    model.add(Convolution2D(32, 5, 5, activation='elu'))
+    model.add(MaxPooling2D())
+    
+    model.add(Convolution2D(64, 3, 3, activation='elu'))
+    model.add(MaxPooling2D())
+        
+    model.add(Flatten())
+    
+    model.add(Dropout(0.5))
+    
+    model.add(Dense(1024, activation='elu'))
+    model.add(Dense(512, activation='elu'))
+    model.add(Dense(64, activation='elu'))
+    model.add(Dense(10, activation='elu'))
+
+    
+    model.add(Dense(1, activation='linear'))
+    model.compile(loss='mse', optimizer="adam")
+    return model
 
 
-# In[78]:
+# In[ ]:
 
 #NVIDIA-Model
-def model(load, shape, checkpoint=None):
+def NVIDIA_model(load, shape, checkpoint=None):
 
     model = Sequential()
     model.add(Convolution2D(24, 5, 5,subsample=(2, 2), activation='elu', input_shape=shape))
@@ -221,11 +222,9 @@ def model(load, shape, checkpoint=None):
 # Based on the [NVIDIA-Architecture](http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf):
 # ![image alt >](res/nvidia.png)
 
-# In[79]:
+# In[ ]:
 
-def _generator(batch_size, X, y, path, validation=False):
-    """Generate batches of training data forever."""
-    
+def _generator(batch_size, X, y, path, validation=False):    
     while 1:
         batch_X, batch_y = [], []
         for i in range(batch_size):
@@ -239,7 +238,7 @@ def _generator(batch_size, X, y, path, validation=False):
         yield np.array(batch_X), np.array(batch_y)
 
 
-# In[80]:
+# In[ ]:
 
 def save_model(net):
     net.save('model.h5')
@@ -249,7 +248,7 @@ def save_model(net):
         outfile.write(json_string)
 
 
-# In[81]:
+# In[ ]:
 
 def train(net,X, y, path):
 
@@ -258,13 +257,13 @@ def train(net,X, y, path):
     return net
 
 
-# In[82]:
+# In[ ]:
 
 def evaluate(net,X, y, path):
     return net.evaluate_generator(_generator(256, X, y, path, validation=True), val_samples=4000)
 
 
-# In[83]:
+# In[ ]:
 
 def learn_drivinig():
     #Build model
@@ -277,22 +276,22 @@ def learn_drivinig():
     #Training
     train(net, X_train, y_train, PATH_TRAIN_FOLDER)
     
-    #Evaluation - Testset
+    #Evaluation - Validation
     loss = evaluate(net, X_test, y_test, PATH_TRAIN_FOLDER)
-    print("Evaluation - Testset: {}".format(loss))
+    print("Evaluation - Validation: {}".format(loss))
     
-    #Evaluation - Validation-Test#1
+    #Evaluation - Testset #1
     X_test,y_test = read_csv(PATH_VALIDATION1+FILENAME_CSV)
     loss = evaluate(net, X_test, y_test, PATH_VALIDATION1)
-    print("Evaluation - Validation-Test#1: {}".format(loss))
+    print("Evaluation - Test#1: {}".format(loss))
         
-    #Evaluation - Validation-Test#2
+    #Evaluation - Testset#2
     X_test,y_test = read_csv(PATH_VALIDATION2+FILENAME_CSV)
     loss = evaluate(net, X_test, y_test, PATH_VALIDATION2)
-    print("Evaluation - Validation-Test#2: {}".format(loss))
+    print("Evaluation - Test#2: {}".format(loss))
 
 
-# In[84]:
+# In[ ]:
 
 def parameter_checker():
     print("*------- STANDARD ---------*")
@@ -354,7 +353,7 @@ def parameter_checker():
     CHANCES_DARKEN = 0.5
 
 
-# In[85]:
+# In[ ]:
 
 if __name__ == '__main__':   
     #parameter_checker()
