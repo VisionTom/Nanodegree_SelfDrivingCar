@@ -339,7 +339,7 @@ SPEED_MINIMUM = 20
 
 
 #7 Results
-
+Watch the whole Track #1 on YouTube:
 [![IMAGE ALT TEXT](http://img.youtube.com/vi/_J6eVQaCUfM/0.jpg)](http://www.youtube.com/watch?v=_J6eVQaCUfM "Whole Video of Training Track")
 
 Driving on Training track, long curved road:
