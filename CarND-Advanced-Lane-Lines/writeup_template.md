@@ -53,7 +53,8 @@ I then used the output `objpoints` and `imgpoints` to compute the camera calibra
 <img src="res/1_calibration2_undistorted.jpg" width="500">
 
 ###2. Apply a distortion correction to raw images.
-Using the parameters from above, I applied the distortion correction on a raw image. The difference can be seen clearly at the tree on the upper left corner.
+Using the parameters from above, I applied the distortion correction on a raw image. The
+ difference can be seen clearly at the tree on the upper left corner.
 
 **Original:**
 
