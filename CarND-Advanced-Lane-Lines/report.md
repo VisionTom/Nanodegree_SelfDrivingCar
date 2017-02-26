@@ -44,6 +44,7 @@ I then used the output `objpoints` and `imgpoints` to compute the camera calibra
 
 <img src="res/1_calibration2.jpg" width="800">
 
+
 **Marked corners:**
 
 <img src="res/1_calibration2_corners.jpg" width="800">
@@ -64,7 +65,7 @@ Using the parameters from above, I applied the distortion correction on a raw im
 
 <img src="res/2_test6_undistorted.jpg" width="800">
 
----
+
 ##Threshold binary image
 
 ###3. Use color transforms, gradients, etc., to create a thresholded binary image.
@@ -206,7 +207,7 @@ The final results of the test images looks like this:
 
 Here's a video of the system in action:
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/gcXr7qwzxv4/0.jpg)](https://www.youtube.com/watch?v=gcXr7qwzxv4)
+[![IMAGE ALT TEXT HERE](res/result.png)](https://www.youtube.com/watch?v=gcXr7qwzxv4)
         
 ---
 
