@@ -175,8 +175,58 @@ The result for *Histogram of Oriented Gradients (HOG)* for four car images and f
 
 ###  iv. Summary on the used Features
 
+In the function `find_cars`, all features from i, ii and iii are merged into one long feature vector. The relevant code parts for the feature vector are:
+
+```python
+def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins):
+
+#[...]
+
+ctrans_tosearch = convert_color(img_tosearch, conv='RGB2YCrCb')
+ch1 = ctrans_tosearch[:,:,0]
+ch2 = ctrans_tosearch[:,:,1]
+ch3 = ctrans_tosearch[:,:,2]
+
+#[...]
+
+# Compute individual channel HOG features for the entire image
+hog1 = get_hog_features(ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
+hog2 = get_hog_features(ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
+hog3 = get_hog_features(ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+
+for xb in range(nxsteps):
+    for yb in range(nysteps):
+        ypos = yb*cells_per_step
+        xpos = xb*cells_per_step
+        # Extract HOG for this patch
+        hog_feat1 = hog1[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+        hog_feat2 = hog2[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+        hog_feat3 = hog3[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+        hog_features = np.hstack((hog_feat1, hog_feat2, hog_feat3))
+
+        xleft = xpos*pix_per_cell
+        ytop = ypos*pix_per_cell
+
+        # Extract the image patch
+        subimg = cv2.resize(ctrans_tosearch[ytop:ytop+window, xleft:xleft+window], (64,64))
+
+        # Get color features
+        spatial_features = bin_spatial(subimg, size=spatial_size)
+        hist_features = color_hist(subimg, nbins=hist_bins)
+
+        test_features = X_scaler.transform(np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1))    
+
+```
+
 ---
 ## 2. Training a classifier to distinguish between Cars and Non-Cars
+
+Having the a long and useful feature vector is the foundation for the next step: classification. Using [Support Vector Machines](https://en.wikipedia.org/wiki/Support_vector_machine) the input vector is used to distinguish cars from not cars.
+
+To train the classifier a given training set was used, consisting of [8792 Car-Images](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [8968 Non-Car-Images](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip). All images are .png and have a size of 64x64px. Here are some examples of the training data:
+
+<img src="res/examples_cars_notcars.png" width="800">
+
 
 ---
 ## 3. Implement a sliding-window technique and use the trained classifier to search for vehicles in images.
