@@ -164,7 +164,7 @@ The parameters were set on:
 * ORIENT = 6
 * PIX_PER_CELLS = 8
 * CELL_PER_BLOCK = 2
-* _(The reason for this values are explained in chapter 2.)_
+* _(The reason for this values are explained in chapter 2.iii)_
 
 The result for *Histogram of Oriented Gradients (HOG)* for four car images and four non-car images for each of the *YCrCb-colorspace*:
 
@@ -221,12 +221,135 @@ for xb in range(nxsteps):
 ---
 ## 2. Training a classifier to distinguish between Cars and Non-Cars
 
+###  i. Training data
 Having the a long and useful feature vector is the foundation for the next step: classification. Using [Support Vector Machines](https://en.wikipedia.org/wiki/Support_vector_machine) the input vector is used to distinguish cars from not cars.
 
 To train the classifier a given training set was used, consisting of [8792 Car-Images](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [8968 Non-Car-Images](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip). All images are .png and have a size of 64x64px. Here are some examples of the training data:
 
 <img src="res/examples_cars_notcars.png" width="800">
 
+The training data was split into Training (66%) and Test(33%) data with:
+```python
+X_train, X_test, y_train, y_test = train_test_split(scaled_X, y, test_size=0.33, random_state=41)
+```
+
+###  ii. Support Vector Machine (SVM)
+
+Support Vector Machine is used to classify cars from non-cars. Support Vector Machines are useful for image classification like these. Another good approach would to use Convolutional Neural Networks (Deep Learning). 
+
+```python
+svr = svm.SVC()
+svr.fit(X_train, y_train)
+print('Test Accuracy of SVC = ', round(svr.score(X_test, y_test), 4))
+```
+
+###  iii. Optimizing Feature-Parameter
+In the file `optimize_parameter.ipynb`, the following parameters were tested:
+* SPATIAL_BIN
+* HIST_BINS  
+* ORIENT 
+* PIX_PER_CELLS  
+* CELL_PER_BLOCK 
+
+I tried one parameter after another and chose the best one. A better approach would be to combine all possible parameter-constellation.
+
+
+```python
+for SPATIAL_BIN in param_SPATIAL_BIN:
+    for HIST_BINS in param_HIST_BINS:
+        for ORIENT in param_ORIENT:
+            for PIX_PER_CELLS in param_PIX_PER_CELLS:
+                for CELL_PER_BLOCK in param_CELL_PER_BLOCK:
+                    X_train, X_test, y_train, y_test = feature_all('YCrCb', SPATIAL_BIN, HIST_BINS, ORIENT, PIX_PER_CELLS, CELL_PER_BLOCK)
+                    svr = svm.SVC()
+                    svr.fit(X_train, y_train)
+                    print('****Parameter:******\n' +
+                          'SPATIAL_BIN = {} \nHIST_BINS = {} \nORIENT = {} \nPIX_PER_CELLS = {} \nCELL_PER_BLOCK = {} '.format(SPATIAL_BIN, HIST_BINS, ORIENT, PIX_PER_CELLS, CELL_PER_BLOCK))
+                    print('Test Accuracy of SVC = ', round(svr.score(X_test, y_test), 4))
+```
+
+
+| Parameter        | Score         |
+| ---------------- |:-------------:|
+| SPATIAL_BIN=8    | 0.9939        | Best!
+| SPATIAL_BIN=16   | 0.9924        |
+
+| Parameter        | Score         |
+| ---------------- |:-------------:|
+| HIST_BINS=8      | 0.9909        |
+| HIST_BINS=16     | 0.9924        | 
+| HIST_BINS=32     | 0.9909        |
+| HIST_BINS=64     | 0.9924        | Best!
+
+| Parameter        | Score         |
+| ---------------- |:-------------:|
+| ORIENT=2         | 0.9803        |
+| ORIENT=4         | 0.9909        | 
+| ORIENT=6         | 0.9909        |
+| ORIENT=8         | 0.9924        | Best!
+
+| Parameter        | Score         |
+| ---------------- |:-------------:|
+| PIX_PER_CELLS=2  | 0.9773        |
+| PIX_PER_CELLS=4  | 0.9848        |
+| PIX_PER_CELLS=8  | 0.9909        | Best!
+| PIX_PER_CELLS=16 | 0.9909        |
+| PIX_PER_CELLS=32 | 0.9788        | 
+
+| Parameter        | Score         |
+| ---------------- |:-------------:|
+| CELL_PER_BLOCK=1 | 0.9848        |
+| CELL_PER_BLOCK=2 | 0.9909        | Best!
+| CELL_PER_BLOCK=4 | 0.9909        | 
+| CELL_PER_BLOCK=6 | 0.9879        |
+
+
+*Final Parameters:*
+* SPATIAL_BIN = 8
+* HIST_BINS= 64
+* ORIENT = 8
+* PIX_PER_CELLS = 8
+* CELL_PER_BLOCK = 2
+
+
+###  iv. Optimizing Hyperparameter
+
+Using *sklearn-Grid-Search*, I optimized the Hyperparameter of the Support Vector Machine.
+
+```python
+X_train, X_test, y_train, y_test = feature_all('YCrCb', SPATIAL_BIN, HIST_BINS, ORIENT, PIX_PER_CELLS, CELL_PER_BLOCK)
+
+parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
+                     'C': [1, 10, 100, 1000]},
+                    {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
+
+svr = svm.SVC()
+clf = GridSearchCV(svr, parameters)
+
+clf.fit(X_train, y_train)
+```
+
+*The Result:*
+```python
+Best parameters set found on development set:
+
+{'kernel': 'rbf', 'gamma': 0.0001, 'C': 10}
+
+Grid scores on development set:
+
+0.914 (+/-0.019) for {'kernel': 'rbf', 'gamma': 0.001, 'C': 1}
+0.987 (+/-0.012) for {'kernel': 'rbf', 'gamma': 0.0001, 'C': 1}
+0.917 (+/-0.019) for {'kernel': 'rbf', 'gamma': 0.001, 'C': 10}
+0.991 (+/-0.005) for {'kernel': 'rbf', 'gamma': 0.0001, 'C': 10}
+0.917 (+/-0.019) for {'kernel': 'rbf', 'gamma': 0.001, 'C': 100}
+0.991 (+/-0.005) for {'kernel': 'rbf', 'gamma': 0.0001, 'C': 100}
+0.917 (+/-0.019) for {'kernel': 'rbf', 'gamma': 0.001, 'C': 1000}
+0.991 (+/-0.005) for {'kernel': 'rbf', 'gamma': 0.0001, 'C': 1000}
+0.989 (+/-0.003) for {'kernel': 'linear', 'C': 1}
+0.989 (+/-0.003) for {'kernel': 'linear', 'C': 10}
+0.989 (+/-0.003) for {'kernel': 'linear', 'C': 100}
+0.989 (+/-0.003) for {'kernel': 'linear', 'C': 1000}
+```
 
 ---
 ## 3. Implement a sliding-window technique and use the trained classifier to search for vehicles in images.
