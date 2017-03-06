@@ -16,7 +16,15 @@ The steps of this project are the following:
   3. Histogram of Oriented Gradients (HOG) feature 
   4. Summary on the used Features
 2. Training a classifier to distinguish between Cars and Non-Cars
+  1. Training data
+  2. Support Vector Machine (SVM)
+  3. Optimizing Feature-Parameter
 3. Implement a sliding-window technique and use the trained classifier to search for vehicles in images.
+  1. Detection and classification through Sliding Windows
+  2. Improving the result by using Heatmaps
+  3. Application of the pipeline for videos
+4. Results in a Video
+5. Furhter Improvements:
 
 ---
 ## 1. Generating Features
@@ -82,26 +90,26 @@ def plot_colorhistogram(color=None, title_a='R', title_b='G', title_c='B', funct
         ax[i][3].set_title(title_c)
 ```
 
-The result for *Color Transform Histogram* for four car images and four non-car images for *RGB-colorspace*:
+The result for **Color Transform Histogram** for four car images and four non-car images for **RGB-colorspace**:
 
 <img src="res/i_1.png" width="800">
 
 Some patterns are visible for the human eye. However the color space *RGB* has some deficits, because it will always be different for every vehicle color. Other color spaces like *HLS* or *YCrCb* could be better.
-https://en.wikipedia.org/wiki/RGB_color_model
-https://en.wikipedia.org/wiki/HSL_and_HSV
-https://en.wikipedia.org/wiki/YCbCr
+* https://en.wikipedia.org/wiki/RGB_color_model
+* https://en.wikipedia.org/wiki/HSL_and_HSV
+* https://en.wikipedia.org/wiki/YCbCr
 
-The result for *Color Transform Histogram* for four car images and four non-car images for *HLS-colorspace*:
+The result for **Color Transform Histogram** for four car images and four non-car images for **HLS-colorspace**:
 
 <img src="res/i_2.png" width="800">
 
-The result for *Color Transform Histogram* for four car images and four non-car images for *YCrCb-colorspace*:
+The result for **Color Transform Histogram** for four car images and four non-car images for **YCrCb-colorspace**:
 
 <img src="res/i_3.png" width="800">
 
 The patterns are way more distinguishable with *HLS* or *YCrCb*, than with *RGB*. 
 
-*The final decision was made on the YCrCb-Colorspace.*
+**The final decision was made on the YCrCb-Colorspace.**
 
 ###  ii. Spatial Binned Color Feature
 
@@ -123,15 +131,15 @@ The result for *Spatial Binned Color Feature* for four car images and four non-c
 
 <img src="res/ii_1.png" width="800">
 
-The result for *Spatial Binned Color Feature* for four car images and four non-car images for *HLS-colorspace*:
+The result for **Spatial Binned Color Feature** for four car images and four non-car images for **HLS-colorspace**:
 
 <img src="res/ii_2.png" width="800">
 
-The result for *Spatial Binned Color Feature* for four car images and four non-car images for *YCrCb-colorspace*:
+The result for **Spatial Binned Color Feature** for four car images and four non-car images for **YCrCb-colorspace**:
 
 <img src="res/ii_3.png" width="800">
 
-*The final decision was made again on the YCrCb-Colorspace.*
+**The final decision was made again on the YCrCb-Colorspace.**
 
 ###  iii. Histogram of Oriented Gradients (HOG) feature 
 
@@ -166,7 +174,7 @@ The parameters were set on:
 * CELL_PER_BLOCK = 2
 * _(The reason for this values are explained in chapter 2.iii)_
 
-The result for *Histogram of Oriented Gradients (HOG)* for four car images and four non-car images for each of the *YCrCb-colorspace*:
+The result for **Histogram of Oriented Gradients (HOG)** for four car images and four non-car images for each of the **YCrCb-colorspace**:
 
 <img src="res/iii_1.png" width="800">
 <img src="res/iii_2.png" width="800">
@@ -314,7 +322,7 @@ for SPATIAL_BIN in param_SPATIAL_BIN:
 
 ###  iv. Optimizing Hyperparameter
 
-Using *sklearn-Grid-Search*, I optimized the Hyperparameter of the Support Vector Machine.
+Using [sklearn-Grid-Search](http://scikit-learn.org/stable/modules/grid_search.html), I optimized the Hyperparameter of the Support Vector Machine.
 
 ```python
 X_train, X_test, y_train, y_test = feature_all('YCrCb', SPATIAL_BIN, HIST_BINS, ORIENT, PIX_PER_CELLS, CELL_PER_BLOCK)
@@ -329,7 +337,7 @@ clf = GridSearchCV(svr, parameters)
 clf.fit(X_train, y_train)
 ```
 
-*The Result:*
+**The Result:**
 ```python
 Best parameters set found on development set:
 
@@ -352,4 +360,160 @@ Grid scores on development set:
 ```
 
 ---
-## 3. Implement a sliding-window technique and use the trained classifier to search for vehicles in images.
+## 3. Implement a sliding-window technique and use the trained classifier to search for vehicles in images
+
+### i. Detection and classification through Sliding Windows
+
+The classifcation is built on Support Vector Machine and the 3 described feature-vectors 1) bin_spatial, 2) color_hist and 3) hog_feat for every channel. The function `find_cars` takes this trained classificator and the tuned parameters and returns an image with drawn rectangles around detected vehicles, as well as the windows coordinates.
+
+The function is based on a overlapping sliding window technique with a fixed size, which is scrolling through the picture. The size as well as other parameters were tuned by trial-and-error.
+
+The Feature Vectors are extracted from these patches and fed into the SVM-classificator. 
+
+```python
+def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, cell_per_block, spatial_size, hist_bins, hot_windows):
+
+    draw_img = np.copy(img)
+    img = img.astype(np.float32)/255
+    
+    img_tosearch = img[ystart:ystop,:,:]
+    ctrans_tosearch = convert_color(img_tosearch, conv='RGB2YCrCb')
+    if scale != 1:
+        imshape = ctrans_tosearch.shape
+        ctrans_tosearch = cv2.resize(ctrans_tosearch, (np.int(imshape[1]/scale), np.int(imshape[0]/scale)))
+
+    ch1 = ctrans_tosearch[:,:,0]
+    ch2 = ctrans_tosearch[:,:,1]
+    ch3 = ctrans_tosearch[:,:,2]
+
+    # Define blocks and steps as above
+    nxblocks = (ch1.shape[1] // pix_per_cell)-1
+    nyblocks = (ch1.shape[0] // pix_per_cell)-1 
+    nfeat_per_block = orient*cell_per_block**2
+    
+    # 64 was the orginal sampling rate, with 8 cells and 8 pix per cell
+    window = 64
+    nblocks_per_window = (window // pix_per_cell)-1 
+    cells_per_step = 2  # Instead of overlap, define how many cells to step
+    nxsteps = (nxblocks - nblocks_per_window) // cells_per_step
+    nysteps = (nyblocks - nblocks_per_window) // cells_per_step
+
+    # Compute individual channel HOG features for the entire image
+    hog1 = get_hog_features(ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog2 = get_hog_features(ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog3 = get_hog_features(ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+ 
+    for xb in range(nxsteps):
+        for yb in range(nysteps):
+            ypos = yb*cells_per_step
+            xpos = xb*cells_per_step
+            # Extract HOG for this patch
+            hog_feat1 = hog1[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+            hog_feat2 = hog2[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+            hog_feat3 = hog3[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+            hog_features = np.hstack((hog_feat1, hog_feat2, hog_feat3))
+
+            xleft = xpos*pix_per_cell
+            ytop = ypos*pix_per_cell
+
+            # Extract the image patch
+            subimg = cv2.resize(ctrans_tosearch[ytop:ytop+window, xleft:xleft+window], (64,64))
+
+            # Get color features
+            spatial_features = bin_spatial(subimg, size=spatial_size)
+            hist_features = color_hist(subimg, nbins=hist_bins)
+
+            # Scale features and make a prediction
+            test_features = X_scaler.transform(np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1))    
+            #test_features = X_scaler.transform(np.hstack((spatial_features, hist_features, hog_features)))
+            find_Before_Scaler = np.hstack((spatial_features, hist_features, hog_features))
+
+            test_prediction = svc.predict(test_features)
+
+            if test_prediction == 1:
+                xbox_left = np.int(xleft*scale)
+                ytop_draw = np.int(ytop*scale)
+                win_draw = np.int(window*scale)
+                top_left = (xbox_left, ytop_draw+ystart)
+                down_right = (xbox_left+win_draw,ytop_draw+win_draw+ystart)
+                cv2.rectangle(draw_img, top_left , down_right, (0,0,255),6) 
+                
+                # Assuming each "box" takes the form ((x1, y1), (x2, y2))
+                hot_windows.append((top_left, down_right))
+
+    return draw_img, hot_windows
+```
+
+
+**The result:**
+
+
+<img src="res/3_i.png" width="800">
+
+### ii. Improving the result by using Heatmaps
+
+The result from `find_cars` is suboptimal: Although the parameters were tuned for the Support Vector Machine, the image contains some False Positive and Duplicate Detections. A False Positive can be seen in the following image on the left side, several Duplicate Detections are over the cars on the right side of the image:
+
+<img src="res/3_ii_1.png" width="400">
+
+To reduce these problems, a heatmap is used. For every detection the heat map will be added "heat" (+=1). Because a single car contains several positive detections, there will be a "Hot Spot". By using a threshold, cars can be distinguished by noise. Another benefit are tight rectangles around the cars.
+
+Using the [label function from scipy](https://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.ndimage.measurements.label.html), single hotspots will be grouped and labeled. Through this we can make distinctions between single cars.
+
+*The result from the heat map:*
+<img src="res/3_ii_2.png" width="1000">
+
+As we can see in the second to the last image, False Positives and the Duplicate Detections can be effectively reduced by using Heatmaps.
+
+### iii. Application of the pipeline for videos
+
+The whole pipeline is applied on every image of a video by using the function `find_vehicles_in_video`:
+
+```python
+def find_vehicles_in_video(image):
+    hot_windows = []
+
+    image_classified, hot_windows = find_cars(img=image,ystart=YSTART,ystop=YSTOP, scale=SCALE, svc=svc, X_scaler=X_scaler, orient=ORIENT, 
+                      pix_per_cell=PIX_PER_CELLS,cell_per_block=CELL_PER_BLOCK, spatial_size=(SPATIAL_BIN, SPATIAL_BIN), hist_bins=HIST_BINS, hot_windows=hot_windows)
+    
+    
+    heat = np.zeros_like(image[:,:,0]).astype(np.float)
+    heat = add_heat(heat,hot_windows)
+
+    # Apply threshold to help remove false positives
+    heat = apply_threshold(heat,1)
+
+    # Visualize the heatmap when displaying    
+    heatmap = np.clip(heat, 0, 255)
+
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+    draw_img = draw_labeled_bboxes(np.copy(image), labels)
+    
+    return draw_img    
+
+#Reading the video image by image and detect and classify vehicles
+output0 = 'output_test_video.mp4'
+clip0 = VideoFileClip("test_video.mp4")
+output_clip0 = clip0.fl_image(find_vehicles_in_video) 
+%time output_clip0.write_videofile(output0, audio=False)
+```
+
+
+## 4. Results in a video
+
+
+**The resulting video**:
+
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/rWJBPTzSW2k/0.jpg)](https://www.youtube.com/watch?v=rWJBPTzSW2k)
+
+
+## 5. Discussion and further improvements:
+The system could fail by having a lot of shadows or high contrast light. Not learned vehicles like trucks or bikes will probably fail, too. 
+
+To improve the system, the following measures could be taken into account:
+- Using the mean of rectangles over several images, a smoother result could be achieved
+- By further improving the input feature and parameters the system could gain in stability
+- Deep learning such as Convolutional Neural Networks could possibly be highly better than Support Vector Machine, however they are also have higher resource requirements.
+- Instead of using a fixed window size, the detection could be also improved. Vehicles in the vertical center of a video appear smaller because they are further away. On the other side, the closer a car, the bigger it appears. By using different window sizes the system could take account of this phenomenon.
